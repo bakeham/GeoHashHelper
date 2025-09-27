@@ -22,6 +22,93 @@ interface ValidationSuggestion {
   correctedValue?: string;
 }
 
+// 精度描述函数
+const getPrecisionDescription = (length: number): string => {
+  const precisionMap: Record<number, string> = {
+    1: '±2500公里',
+    2: '±630公里',
+    3: '±78公里',
+    4: '±20公里',
+    5: '±2.4公里',
+    6: '±610米',
+    7: '±76米',
+    8: '±19米',
+    9: '±2.4米',
+    10: '±60厘米',
+    11: '±7.5厘米',
+    12: '±1.9厘米'
+  };
+  
+  return precisionMap[length] || '精度未知';
+};
+
+// 智能建议函数
+const getSmartSuggestion = (input: string, result: ValidationResult): string => {
+  if (!result.error) return '';
+
+  // 检查常见错误模式
+  if (result.error.includes('无效字符')) {
+    const invalidChars = input.match(/[ailo]/gi);
+    if (invalidChars) {
+      return `发现禁用字符: ${invalidChars.join(', ')}。GeoHash不能包含 a, i, l, o`;
+    }
+    
+    const otherInvalid = input.match(/[^0-9b-z]/gi);
+    if (otherInvalid) {
+      return `发现无效字符: ${otherInvalid.join(', ')}。只能使用 0-9, b-z`;
+    }
+  }
+
+  if (result.error.includes('长度')) {
+    if (input.length > 12) {
+      return 'GeoHash过长，请截取前12位';
+    }
+    if (input.length === 0) {
+      return '请输入GeoHash字符串';
+    }
+  }
+
+  return '请检查GeoHash格式，参考示例进行输入';
+};
+
+// 修正建议函数
+const suggestCorrection = (input: string): string | null => {
+  if (!input) return null;
+
+  let corrected = input.toLowerCase();
+  
+  // 替换常见错误字符
+  const replacements: Record<string, string> = {
+    'a': '0',
+    'i': '1',
+    'l': '1',
+    'o': '0'
+  };
+
+  let hasChanges = false;
+  for (const [invalid, valid] of Object.entries(replacements)) {
+    if (corrected.includes(invalid)) {
+      corrected = corrected.replace(new RegExp(invalid, 'g'), valid);
+      hasChanges = true;
+    }
+  }
+
+  // 移除其他无效字符
+  const cleaned = corrected.replace(/[^0-9b-z]/g, '');
+  if (cleaned !== corrected) {
+    corrected = cleaned;
+    hasChanges = true;
+  }
+
+  // 限制长度
+  if (corrected.length > 12) {
+    corrected = corrected.substring(0, 12);
+    hasChanges = true;
+  }
+
+  return hasChanges && corrected.length > 0 ? corrected : null;
+};
+
 const SmartInputValidator: React.FC<SmartInputValidatorProps> = ({
   value,
   isBatchMode,
@@ -154,89 +241,6 @@ const SmartInputValidator: React.FC<SmartInputValidatorProps> = ({
       overallStatus
     };
   }, [value, isBatchMode]);
-
-  const getPrecisionDescription = (length: number): string => {
-    const precisionMap: Record<number, string> = {
-      1: '±2500公里',
-      2: '±630公里',
-      3: '±78公里',
-      4: '±20公里',
-      5: '±2.4公里',
-      6: '±610米',
-      7: '±76米',
-      8: '±19米',
-      9: '±2.4米',
-      10: '±60厘米',
-      11: '±7.5厘米',
-      12: '±1.9厘米'
-    };
-    return precisionMap[length] || '±未知';
-  };
-
-  const getSmartSuggestion = (input: string, result: ValidationResult): string => {
-    if (!result.error) return '';
-
-    // 检查常见错误模式
-    if (result.error.includes('无效字符')) {
-      const invalidChars = input.match(/[ailo]/gi);
-      if (invalidChars) {
-        return `发现禁用字符: ${invalidChars.join(', ')}。GeoHash不能包含 a, i, l, o`;
-      }
-      
-      const otherInvalid = input.match(/[^0-9b-z]/gi);
-      if (otherInvalid) {
-        return `发现无效字符: ${otherInvalid.join(', ')}。只能使用 0-9, b-z`;
-      }
-    }
-
-    if (result.error.includes('长度')) {
-      if (input.length > 12) {
-        return 'GeoHash过长，请截取前12位';
-      }
-      if (input.length === 0) {
-        return '请输入GeoHash字符串';
-      }
-    }
-
-    return '请检查GeoHash格式，参考示例进行输入';
-  };
-
-  const suggestCorrection = (input: string): string | null => {
-    if (!input) return null;
-
-    let corrected = input.toLowerCase();
-    
-    // 替换常见错误字符
-    const replacements: Record<string, string> = {
-      'a': '0',
-      'i': '1',
-      'l': '1',
-      'o': '0'
-    };
-
-    let hasChanges = false;
-    for (const [invalid, valid] of Object.entries(replacements)) {
-      if (corrected.includes(invalid)) {
-        corrected = corrected.replace(new RegExp(invalid, 'g'), valid);
-        hasChanges = true;
-      }
-    }
-
-    // 移除其他无效字符
-    const cleaned = corrected.replace(/[^0-9b-z]/g, '');
-    if (cleaned !== corrected) {
-      corrected = cleaned;
-      hasChanges = true;
-    }
-
-    // 限制长度
-    if (corrected.length > 12) {
-      corrected = corrected.substring(0, 12);
-      hasChanges = true;
-    }
-
-    return hasChanges && corrected.length > 0 ? corrected : null;
-  };
 
   const handleCorrectionClick = (correctedValue: string) => {
     // 触发自定义事件，让父组件知道用户选择了修正建议

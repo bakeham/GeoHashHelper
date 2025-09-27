@@ -29,16 +29,17 @@ export const preloadComponents = () => {
 };
 
 // Component wrapper with loading fallback
-export const withSuspense = <T extends object>(
+export function withSuspense<T extends object>(
   Component: React.ComponentType<T>,
-  fallback: React.ReactNode = <div className="animate-pulse bg-gray-200 h-20 rounded"></div>
-) => {
+  fallback?: React.ReactNode
+) {
+  const defaultFallback = <div className="animate-pulse bg-gray-200 h-20 rounded"></div>;
   return (props: T) => (
-    <React.Suspense fallback={fallback}>
+    <React.Suspense fallback={fallback || defaultFallback}>
       <Component {...props} />
     </React.Suspense>
   );
-};
+}
 
 export default {
   LazyResultsDisplay,
